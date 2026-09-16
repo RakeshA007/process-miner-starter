@@ -1,0 +1,15 @@
+﻿# Local environment -- never commit this, everyone rebuilds their own
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local databases and sync state -- generated at runtime, not source code.
+data/*.db
+data/sync_state.json
+
+# Generated output -- regenerated each run, not something to track in git
+output/*.png
+output/*.csv
+output/*.json

@@ -1,8 +1,0 @@
-variant,case_count,pct_of_cases
-Created -> Credit Checked -> Approved -> Picked -> Packed -> Shipped -> Invoiced,57,18.1
-Created -> Credit Checked -> Approved -> Picked,56,17.8
-Created -> Credit Checked -> Approved -> Picked -> Packed,54,17.1
-Created -> Credit Checked -> Approved -> Picked -> Packed -> Shipped -> Invoiced -> Paid,48,15.2
-Created -> Credit Checked -> Approved -> Picked -> Packed -> Shipped -> Invoiced -> Paid -> Closed,47,14.9
-Created -> Credit Checked -> Approved -> Picked -> Packed -> Shipped,38,12.1
-Created,15,4.8
