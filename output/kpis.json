@@ -1,0 +1,9 @@
+{
+  "case_count": 315,
+  "event_count": 1943,
+  "avg_case_duration_hours": 311.5,
+  "distinct_variants": 7,
+  "top_variant": "Created -> Credit Checked -> Approved -> Picked -> Packed -> Shipped -> Invoiced",
+  "top_variant_case_count": 57,
+  "top_variant_pct": 18.1
+}

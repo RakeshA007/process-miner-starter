@@ -1,0 +1,10 @@
+pandas>=2.0,<3.0
+graphviz>=0.20
+sqlalchemy>=2.0
+streamlit>=1.60
+
+# Uncomment the line matching your real source database once you move off
+# the demo SQLite source (only one is usually needed):
+# psycopg2-binary>=2.9      # PostgreSQL
+# pyodbc>=5.0                # SQL Server (also requires the ODBC Driver for SQL Server, installed separately)
+# pymysql>=1.1                # MySQL / MariaDB
