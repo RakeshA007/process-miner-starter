@@ -82,7 +82,7 @@ def build_graph(node_counts, edge_counts, start_counts, end_counts, min_edge_cou
     changes the underlying counts, KPIs, or variant rankings.
     """
     dot = graphviz.Digraph("process_map")
-    dot.attr(rankdir="LR", fontsize="11")
+    dot.attr(rankdir="TB", fontsize="11")
     dot.attr("node", shape="box", style="rounded,filled", fillcolor="#EAF1F6",
              color="#2B5D8C", fontname="Helvetica", fontsize="11")
     dot.attr("edge", color="#52697E", fontname="Helvetica", fontsize="9")
