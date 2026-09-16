@@ -32,11 +32,26 @@ def run_mining(mapped_log: pd.DataFrame):
     mapped_log = mapped_log.sort_values(["case_id", "timestamp"])
     cases = build_cases(mapped_log)
     node_counts, edge_counts, start_counts, end_counts = directly_follows_graph(cases)
-    dot = build_graph(node_counts, edge_counts, start_counts, end_counts)
     kpis = compute_kpis(mapped_log, cases)
     variants_df = compute_variants(cases)
 
     st.subheader("Process map")
+    max_edge_count = max(edge_counts.values()) if edge_counts else 1
+    if max_edge_count > 1:
+        min_edge_count = st.slider(
+            "Minimum path frequency — hide paths that happened fewer times than this "
+            "(raise this to declutter a tangled map; it only hides rare paths, the "
+            "KPIs and variants below are unaffected)",
+            min_value=1, max_value=int(max_edge_count), value=1,
+        )
+    else:
+        min_edge_count = 1
+    dot = build_graph(node_counts, edge_counts, start_counts, end_counts, min_edge_count=min_edge_count)
+    shown = sum(1 for c in edge_counts.values() if c >= min_edge_count)
+    hidden = len(edge_counts) - shown
+    if hidden:
+        st.caption(f"Showing {shown} of {len(edge_counts)} distinct paths "
+                    f"({hidden} rarer path{'s' if hidden != 1 else ''} hidden below the threshold).")
     st.graphviz_chart(dot, use_container_width=True)
 
     st.subheader("KPIs")

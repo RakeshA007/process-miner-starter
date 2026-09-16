@@ -67,12 +67,19 @@ def directly_follows_graph(cases):
     return node_counts, edge_counts, start_counts, end_counts
 
 
-def build_graph(node_counts, edge_counts, start_counts, end_counts):
+def build_graph(node_counts, edge_counts, start_counts, end_counts, min_edge_count=1):
     """
     Builds the process map as a graphviz Digraph object, without writing
     anything to disk. Kept separate from render_process_map() so the
     Streamlit app (app.py) can render this same picture directly in the
     browser, instead of round-tripping through a PNG file.
+
+    min_edge_count: only draw a directly-follows edge if it happened at
+    least this many times. On a process with thousands of distinct
+    variants, drawing every single edge produces unreadable "spaghetti" --
+    raising this is the standard declutter control every process mining
+    tool offers. It only hides rare edges from the picture; it never
+    changes the underlying counts, KPIs, or variant rankings.
     """
     dot = graphviz.Digraph("process_map")
     dot.attr(rankdir="LR", fontsize="11")
@@ -94,6 +101,8 @@ def build_graph(node_counts, edge_counts, start_counts, end_counts):
         dot.edge(activity, "END", label=str(count))
 
     for (a, b), count in edge_counts.items():
+        if count < min_edge_count:
+            continue
         # Line thickness scales with frequency — the most common paths
         # visually stand out, exactly what you want a process map to show.
         penwidth = str(min(1 + count / 50, 6))
@@ -102,8 +111,8 @@ def build_graph(node_counts, edge_counts, start_counts, end_counts):
     return dot
 
 
-def render_process_map(node_counts, edge_counts, start_counts, end_counts, out_path):
-    dot = build_graph(node_counts, edge_counts, start_counts, end_counts)
+def render_process_map(node_counts, edge_counts, start_counts, end_counts, out_path, min_edge_count=1):
+    dot = build_graph(node_counts, edge_counts, start_counts, end_counts, min_edge_count=min_edge_count)
     dot.format = "png"
     dot.render(out_path, cleanup=True)
 

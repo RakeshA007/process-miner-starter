@@ -274,6 +274,17 @@ Every run shows the process map, the four headline KPIs, and the ranked
 variant table — all three tested and confirmed working end to end before
 this was sent to you.
 
+**Decluttering a tangled process map.** On a process with a lot of
+variation (hundreds or thousands of distinct paths), the process map can
+turn into unreadable "spaghetti" — every path gets drawn, including
+one-off exceptions that only happened once or twice. Right above the
+process map there's a **"Minimum path frequency"** slider: raise it and
+paths that happened fewer times than that threshold disappear from the
+picture, leaving just the dominant flow. This only changes what's drawn —
+the KPIs and the variant ranking below are computed from the full data
+regardless of where the slider is set, so you're never losing information,
+just hiding visual noise while you look at the map.
+
 This is also the natural point to stop and re-read the "Ready for Phase 3"
 exit criterion from the Solo Build Route: **someone who isn't you** should
 be able to open this app, load their own data, and get a process map back
