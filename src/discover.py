@@ -140,15 +140,24 @@ def compute_kpis(log, cases):
     for case_id, group in log.groupby("case_id"):
         span = group["timestamp"].max() - group["timestamp"].min()
         durations.append(span.total_seconds() / 3600.0)  # hours
+    durations_series = pd.Series(durations)
 
     variant_counts = Counter(tuple(a) for a in cases.values())
     top_variant, top_count = variant_counts.most_common(1)[0]
 
+    event_count = int(sum(len(a) for a in cases.values()))
+    distinct_activities = len({activity for activities in cases.values() for activity in activities})
+
     return {
         "case_count": len(cases),
-        "event_count": int(sum(len(a) for a in cases.values())),
+        "event_count": event_count,
         "avg_case_duration_hours": round(sum(durations) / len(durations), 1),
+        "median_case_duration_hours": round(float(durations_series.median()), 1),
+        "min_case_duration_hours": round(float(durations_series.min()), 1),
+        "max_case_duration_hours": round(float(durations_series.max()), 1),
         "distinct_variants": len(variant_counts),
+        "distinct_activities": distinct_activities,
+        "avg_events_per_case": round(event_count / len(cases), 1),
         "top_variant": " -> ".join(top_variant),
         "top_variant_case_count": top_count,
         "top_variant_pct": round(100 * top_count / len(cases), 1),

@@ -24,16 +24,54 @@ st.set_page_config(page_title="Process Miner", layout="wide")
 st.title("Process Miner")
 st.caption("Phase 2 — the Phase 1 mining logic, wrapped for a real user instead of a terminal.")
 
+# Every KPI the app knows how to compute, keyed by the label shown on
+# screen. Add a new metric here (and to compute_kpis in src/discover.py if
+# it isn't already in the dict it returns) and it automatically becomes
+# something the user can choose to display below.
+KPI_CATALOG = {
+    "Cases": "case_count",
+    "Events": "event_count",
+    "Avg case duration (hrs)": "avg_case_duration_hours",
+    "Median case duration (hrs)": "median_case_duration_hours",
+    "Min case duration (hrs)": "min_case_duration_hours",
+    "Max case duration (hrs)": "max_case_duration_hours",
+    "Distinct variants": "distinct_variants",
+    "Distinct activities": "distinct_activities",
+    "Avg events per case": "avg_events_per_case",
+}
+DEFAULT_KPIS = ["Cases", "Events", "Avg case duration (hrs)", "Distinct variants"]
 
-def run_mining(mapped_log: pd.DataFrame):
-    """Takes an already-mapped event log (case_id, activity, timestamp,
-    resource columns) and renders the full analysis. This is the exact
-    same three-function pipeline as src/discover.py's main()."""
+
+def compute_mining_results(mapped_log: pd.DataFrame) -> dict:
+    """The expensive, once-per-dataset work: build cases, the
+    directly-follows graph, KPIs, and variants. Kept separate from
+    rendering so a cheap, interactive control (like the process map's
+    frequency slider) never has to re-run this from scratch -- only a
+    fresh "Run process mining" click does."""
     mapped_log = mapped_log.sort_values(["case_id", "timestamp"])
     cases = build_cases(mapped_log)
     node_counts, edge_counts, start_counts, end_counts = directly_follows_graph(cases)
-    kpis = compute_kpis(mapped_log, cases)
-    variants_df = compute_variants(cases)
+    return {
+        "node_counts": node_counts,
+        "edge_counts": edge_counts,
+        "start_counts": start_counts,
+        "end_counts": end_counts,
+        "kpis": compute_kpis(mapped_log, cases),
+        "variants_df": compute_variants(cases),
+    }
+
+
+def render_mining_results(results: dict):
+    """Cheap rendering step. Streamlit reruns this whole script on every
+    interaction -- including just dragging the slider below -- so this
+    function deliberately does no heavy recomputation, only reads from
+    the already-computed `results` dict."""
+    node_counts = results["node_counts"]
+    edge_counts = results["edge_counts"]
+    start_counts = results["start_counts"]
+    end_counts = results["end_counts"]
+    kpis = results["kpis"]
+    variants_df = results["variants_df"]
 
     st.subheader("Process map")
     max_edge_count = max(edge_counts.values()) if edge_counts else 1
@@ -55,11 +93,20 @@ def run_mining(mapped_log: pd.DataFrame):
     st.graphviz_chart(dot, use_container_width=True)
 
     st.subheader("KPIs")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Cases", kpis["case_count"])
-    c2.metric("Events", kpis["event_count"])
-    c3.metric("Avg case duration (hrs)", kpis["avg_case_duration_hours"])
-    c4.metric("Distinct variants", kpis["distinct_variants"])
+    chosen = st.multiselect(
+        "Choose which KPIs to show",
+        options=list(KPI_CATALOG.keys()),
+        default=DEFAULT_KPIS,
+    )
+    if chosen:
+        # Lay chosen metrics out four to a row, however many are picked.
+        for row_start in range(0, len(chosen), 4):
+            row_labels = chosen[row_start:row_start + 4]
+            row_cols = st.columns(len(row_labels))
+            for col, label in zip(row_cols, row_labels):
+                col.metric(label, kpis[KPI_CATALOG[label]])
+    else:
+        st.caption("No KPIs selected — pick at least one above to see numbers here.")
 
     left, right = st.columns([3, 2])
     with left:
@@ -76,6 +123,12 @@ source = st.sidebar.radio(
     "Data source",
     ["Upload a CSV", "Use the Phase 1 sample data", "Sync from the demo source database"],
 )
+
+# Switching data source starts fresh, so you're never looking at a stale
+# map computed from a different file.
+if st.session_state.get("mining_source") != source:
+    st.session_state.pop("mining_results", None)
+    st.session_state["mining_source"] = source
 
 if source == "Sync from the demo source database":
     st.sidebar.caption("This runs the real incremental connector (src/extract_from_db.py) "
@@ -94,7 +147,9 @@ if source == "Sync from the demo source database":
             conn.close()
             if len(mapped):
                 st.info(f"Showing {len(mapped)} events currently in data/eventlog.db.")
-                run_mining(mapped)
+                with st.spinner("Running process mining..."):
+                    results = compute_mining_results(mapped)
+                render_mining_results(results)
             else:
                 st.warning("event_log table exists but is empty — click 'Run sync now' in the sidebar.")
         else:
@@ -133,7 +188,16 @@ else:
         resource_col = st.sidebar.selectbox("Resource column (optional)", resource_options,
                                              index=min(4, len(resource_options) - 1))
 
-        if st.sidebar.button("Run process mining", type="primary"):
+        # Two-step "disable, then crunch" so the button visibly greys out
+        # the instant you click it, instead of sitting there looking
+        # unresponsive while a big file is processed. Streamlit reruns the
+        # whole script on every interaction, so this takes two reruns: one
+        # to show the disabled button, one to do the actual work.
+        run_clicked = st.sidebar.button(
+            "Run process mining", type="primary",
+            disabled=st.session_state.get("mining_running", False),
+        )
+        if run_clicked:
             try:
                 mapped = pd.DataFrame({
                     "case_id": df[case_col].astype(str),
@@ -142,8 +206,23 @@ else:
                     "resource": df[resource_col] if resource_col != "(none)" else "",
                 })
             except Exception as e:
-                st.error(f"Couldn't map those columns: {e}")
+                st.sidebar.error(f"Couldn't map those columns: {e}")
             else:
-                run_mining(mapped)
+                st.session_state["pending_mapped_log"] = mapped
+                st.session_state["mining_running"] = True
+                st.rerun()
+
+        if st.session_state.get("mining_running"):
+            st.info("⏳ Running process mining — this can take a little while on large "
+                    "files. The button in the sidebar is greyed out until this finishes, "
+                    "so a single click is enough.")
+            with st.spinner("Crunching the event log..."):
+                mapped = st.session_state.pop("pending_mapped_log")
+                st.session_state["mining_results"] = compute_mining_results(mapped)
+            st.session_state["mining_running"] = False
+            st.rerun()
+
+        if "mining_results" in st.session_state:
+            render_mining_results(st.session_state["mining_results"])
     else:
         st.info("Choose a data source in the sidebar to get started.")
